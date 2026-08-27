@@ -1,0 +1,62 @@
+_schema-version: "3.3.0"
+ID: m9-stt-vendor-masking
+description: "Vendor pricing document masking PoC"
+version: 1.0.0
+
+parameters:
+  enable-parallel-deployments: true
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm i
+
+modules:
+  - name: m9-stt-vendor-masking
+    type: nodejs
+    path: ./
+    parameters:
+      app-name: m9-stt-vendor-masking-${space}
+      # Large PDF redaction / Word masking holds the whole document plus parsed
+      # structures in memory — 512M caused OOM crashes (503 mid-stream) on CF.
+      memory: 2G
+      disk-quota: 1G
+      buildpack: nodejs_buildpack
+      command: npm run start
+      keep-existing-routes: true
+      health-check-type: http
+      health-check-http-endpoint: /health
+    properties:
+      NODE_ENV: production
+    build-parameters:
+      builder: custom
+      commands:
+        - npm run build
+      ignore:
+        - node_modules/
+        - frontend/node_modules/
+        - .git/
+        - src/
+        - frontend/src/
+        - frontend/tsconfig.json
+        - frontend/tsconfig.node.json
+        - frontend/vite.config.ts
+        - frontend/tailwind.config.js
+        - frontend/postcss.config.js
+        - frontend/index.html
+        - mta_archives/
+    requires:
+      - name: m9-stt-vendor-masking-xsuaa
+
+resources:
+  - name: m9-stt-vendor-masking-xsuaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      service-name: m9-stt-vendor-masking-xsuaa-${space}
+      path: ./xs-security.json
+      config:
+        xsappname: m9-stt-vendor-masking-${space}
+        tenant-mode: dedicated
